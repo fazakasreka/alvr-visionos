@@ -247,6 +247,7 @@ class WorldTracker {
     var handTracking: HandTrackingProvider!
     var sceneReconstruction: SceneReconstructionProvider!
     var planeDetection: PlaneDetectionProvider!
+    var markerTracker: MarkerTracker!
 #if XCODE_BETA_26
     //var accessoryTracking: AccessoryTrackingProvider?
     var accessoryTracking: (any DataProvider)?
@@ -560,6 +561,7 @@ class WorldTracker {
         handTracking = HandTrackingProvider()
         sceneReconstruction = SceneReconstructionProvider()
         planeDetection =  PlaneDetectionProvider(alignments: [.horizontal, .vertical])
+        markerTracker = MarkerTracker()
 
         // The Steam Controller is not a GCController and never appears in
         // ARKit, so nothing else in the tracking bring-up would ever open it.
@@ -634,6 +636,9 @@ class WorldTracker {
         if authStatus[.worldSensing] == .allowed {
             //trackingList.append(sceneReconstruction)
             trackingList.append(planeDetection)
+            if let imageTracking = markerTracker.imageTracking {
+                trackingList.append(imageTracking)
+            }
         }
 #if XCODE_BETA_26
         if #available(visionOS 26.0, *) {
@@ -672,6 +677,9 @@ class WorldTracker {
         }
         Task {
             await processAccessoryTrackingUpdates()
+        }
+        Task {
+            await markerTracker.processUpdates()
         }
     }
     
@@ -3482,6 +3490,9 @@ class WorldTracker {
             
             // New API, not upstreamed
             alvr_send_tracking_and_face_data(reportedTargetTimestampNS, trackingMotions, UInt64(trackingMotions.count), [UnsafePointer(skeletonLeftPtr), UnsafePointer(skeletonRightPtr)], [UnsafePointer(eyeGazeLeftPtr), UnsafePointer(eyeGazeRightPtr)], UnsafePointer(fbFaceExpressions))
+
+            // Same conversion as the head pose
+            markerTracker?.send(steamVRFromApple: self.worldTrackingSteamVRTransform.inverse * floorCorrectionTransform.asFloat4x4())
 
             if self.needsRecenterTrigger {
                 // TODO raycast to the nearest wall/TV
