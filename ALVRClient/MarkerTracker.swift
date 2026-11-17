@@ -34,6 +34,14 @@ class MarkerTracker {
     private var markers: [String: Marker] = [:]
     private var markersLock = NSObject()
     private var lastSent: TimeInterval = 0
+    private var reportedUnavailable = false
+
+    // alvr_log reaches the streamer's session_log.txt while connected, so a run can be checked
+    // without a console on the headset
+    static func log(_ message: String) {
+        print(message)
+        alvr_log(AlvrLogLevel(ALVR_LOG_LEVEL_INFO.rawValue), message)
+    }
 
     init() {
         let referenceImages = ReferenceImage.loadReferenceImages(inGroupNamed: MarkerTracker.referenceImageGroup)
@@ -41,7 +49,7 @@ class MarkerTracker {
             imageTracking = ImageTrackingProvider(referenceImages: referenceImages)
         }
         else {
-            print("QR code tracking is not available, reference images:", referenceImages.count)
+            MarkerTracker.log("QR code tracking is not available, reference images: \(referenceImages.count)")
             imageTracking = nil
         }
     }
@@ -57,14 +65,15 @@ class MarkerTracker {
             objc_sync_enter(markersLock)
             if update.event != .removed && anchor.isTracked {
                 if markers[id] == nil {
-                    print("QR code \"\(id)\" at", anchor.originFromAnchorTransform.columns.3)
+                    // A scale factor far from 1 means the reference image's size is not the printed one
+                    MarkerTracker.log("QR code \"\(id)\" seen at \(anchor.originFromAnchorTransform.columns.3), scale factor \(anchor.estimatedScaleFactor)")
                 }
                 markers[id] = Marker(
                     originFromMarker: anchor.originFromAnchorTransform * MarkerTracker.anchorFromMarker,
                     size: Float(anchor.referenceImage.physicalSize.width) * anchor.estimatedScaleFactor)
             }
             else if markers.removeValue(forKey: id) != nil {
-                print("QR code \"\(id)\" lost")
+                MarkerTracker.log("QR code \"\(id)\" lost")
             }
             objc_sync_exit(markersLock)
         }
@@ -72,7 +81,14 @@ class MarkerTracker {
 
     // Reports the markers in view every sendInterval, in the space the tracking is sent in
     func send(steamVRFromApple: simd_float4x4) {
-        guard imageTracking != nil else { return }
+        guard imageTracking != nil else {
+            // init's message comes before the connection, so the streamer never gets it
+            if !reportedUnavailable {
+                reportedUnavailable = true
+                MarkerTracker.log("QR code tracking is not available (not supported, or no reference images in \"\(MarkerTracker.referenceImageGroup)\")")
+            }
+            return
+        }
 
         let now = CACurrentMediaTime()
         if now - lastSent < MarkerTracker.sendInterval {
