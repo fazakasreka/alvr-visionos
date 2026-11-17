@@ -2,8 +2,9 @@
 //  MarkerTracker.swift
 //
 // QR codes seen by the headset, reported to the streamer for its QR code recentering mode. Found by
-// image tracking: each reference image in the "QR Codes" AR resource group is a printed code, named
-// after the code's text and sized as printed.
+// image tracking: each reference image in the "QR Codes" AR resource group is a printed code, cropped
+// to its black pattern and sized as printed. Image tracking cannot read a code, so codeTexts gives
+// each image's text, which is what the Quest reports for the same code.
 //
 
 import Foundation
@@ -13,6 +14,12 @@ import QuartzCore // CACurrentMediaTime
 class MarkerTracker {
     static let referenceImageGroup = "QR Codes"
     static let sendInterval: TimeInterval = 0.5
+
+    // Reference image name -> the code's text; asset names cannot hold a URL. Unlisted images report
+    // their name.
+    static let codeTexts = [
+        "cae-qr": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    ]
 
     // ARKit puts an image anchor's +Y out of the image's face and its -Z towards the image's top edge,
     // ALVR wants +Y towards the top edge and +Z out of the face
@@ -44,7 +51,8 @@ class MarkerTracker {
 
         for await update in imageTracking.anchorUpdates {
             let anchor = update.anchor
-            guard let id = anchor.referenceImage.name else { continue }
+            guard let name = anchor.referenceImage.name else { continue }
+            let id = MarkerTracker.codeTexts[name] ?? name
 
             objc_sync_enter(markersLock)
             if update.event != .removed && anchor.isTracked {
