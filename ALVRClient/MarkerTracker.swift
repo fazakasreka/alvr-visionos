@@ -8,6 +8,7 @@
 
 import Foundation
 import ARKit
+import QuartzCore // CACurrentMediaTime
 
 class MarkerTracker {
     static let referenceImageGroup = "QR Codes"
