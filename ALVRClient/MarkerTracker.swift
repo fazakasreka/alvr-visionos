@@ -1,7 +1,7 @@
 //
 //  MarkerTracker.swift
 //
-// QR codes seen by the headset, reported to the streamer for its QR code recentering mode. Found by
+// QR codes seen by the headset, reported to the streamer for OpenXR applications to track. Found by
 // image tracking: each reference image in the "QR Codes" AR resource group is a printed code, cropped
 // to its black pattern and sized as printed. Image tracking cannot read a code, so codeTexts gives
 // each image's text, which is what the Quest reports for the same code.
@@ -43,6 +43,11 @@ class MarkerTracker {
         alvr_log(AlvrLogLevel(ALVR_LOG_LEVEL_INFO.rawValue), message)
     }
 
+    // Whether this headset can report codes, told to the streamer right after alvr_initialize
+    static var isAvailable: Bool {
+        ImageTrackingProvider.isSupported && !ReferenceImage.loadReferenceImages(inGroupNamed: referenceImageGroup).isEmpty
+    }
+
     init() {
         let referenceImages = ReferenceImage.loadReferenceImages(inGroupNamed: MarkerTracker.referenceImageGroup)
         if ImageTrackingProvider.isSupported && !referenceImages.isEmpty {
@@ -79,8 +84,9 @@ class MarkerTracker {
         }
     }
 
-    // Reports the markers in view every sendInterval, in the space the tracking is sent in
-    func send(steamVRFromApple: simd_float4x4) {
+    // Reports the markers in view every sendInterval, in the space the tracking is sent in, with the
+    // timestamp of the tracking sent along
+    func send(steamVRFromApple: simd_float4x4, timestampNS: UInt64) {
         guard imageTracking != nil else {
             // init's message comes before the connection, so the streamer never gets it
             if !reportedUnavailable {
@@ -105,8 +111,8 @@ class MarkerTracker {
 
         let alvrMarkers = zip(ids, current.values).map { id, marker in
             let transform = steamVRFromApple * marker.originFromMarker
-            return AlvrMarker(id: id, pose: AlvrPose(simd_quaternion(transform), transform.columns.3), size: marker.size)
+            return AlvrMarker(text: id, pose: AlvrPose(simd_quaternion(transform), transform.columns.3), size: marker.size)
         }
-        alvr_send_markers(alvrMarkers, UInt64(alvrMarkers.count))
+        alvr_send_markers(timestampNS, alvrMarkers, UInt64(alvrMarkers.count))
     }
 }

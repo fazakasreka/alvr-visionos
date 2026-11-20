@@ -1,4 +1,4 @@
 [submodule "ALVR"]
 	path = ALVR
 	url = https://github.com/fazakasreka/ALVR.git
-	branch = visionpro_transparency_and_qr
+	branch = vr_middelware

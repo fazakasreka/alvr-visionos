@@ -3492,7 +3492,7 @@ class WorldTracker {
             alvr_send_tracking_and_face_data(reportedTargetTimestampNS, trackingMotions, UInt64(trackingMotions.count), [UnsafePointer(skeletonLeftPtr), UnsafePointer(skeletonRightPtr)], [UnsafePointer(eyeGazeLeftPtr), UnsafePointer(eyeGazeRightPtr)], UnsafePointer(fbFaceExpressions))
 
             // Same conversion as the head pose
-            self.markerTracker?.send(steamVRFromApple: self.worldTrackingSteamVRTransform.inverse * self.floorCorrectionTransform.asFloat4x4())
+            self.markerTracker?.send(steamVRFromApple: self.worldTrackingSteamVRTransform.inverse * self.floorCorrectionTransform.asFloat4x4(), timestampNS: reportedTargetTimestampNS)
 
             if self.needsRecenterTrigger {
                 // TODO raycast to the nearest wall/TV
